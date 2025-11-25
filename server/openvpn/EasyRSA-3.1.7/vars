@@ -1,0 +1,30 @@
+# Easy-RSA Variables for Konektika VPN
+# This file is used to configure Easy-RSA settings
+
+# X509 Subject fields
+set_var EASYRSA_REQ_COUNTRY    "TZ"
+set_var EASYRSA_REQ_PROVINCE   "Dar es Salaam"
+set_var EASYRSA_REQ_CITY       "Dar es Salaam"
+set_var EASYRSA_REQ_ORG        "Konektika"
+set_var EASYRSA_REQ_EMAIL      "admin@konektika.com"
+set_var EASYRSA_REQ_OU         "Konektika VPN"
+
+# Key settings
+set_var EASYRSA_KEY_SIZE       2048
+set_var EASYRSA_ALGO           rsa
+set_var EASYRSA_CURVE          secp384r1
+
+# CA settings
+set_var EASYRSA_CA_EXPIRE      3650
+set_var EASYRSA_CERT_EXPIRE    365
+
+# Certificate Revocation List settings
+set_var EASYRSA_CRL_DAYS       180
+
+# Path settings (use forward slashes for Windows)
+set_var EASYRSA                "C:/konektika/server/openvpn/EasyRSA-3.1.7"
+set_var EASYRSA_PKI            "C:/konektika/server/openvpn/EasyRSA-3.1.7/pki"
+set_var EASYRSA_VARS_FILE      "C:/konektika/server/openvpn/EasyRSA-3.1.7/vars"
+
+# Batch mode (no user interaction)
+set_var EASYRSA_BATCH          1
