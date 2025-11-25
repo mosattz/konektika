@@ -117,9 +117,9 @@ router.post('/purchase', [
     const { bundle_id } = req.body;
     const userId = req.user.id;
     
-    // Check if bundle exists and is available
+    // Check if bundle exists
     const bundles = await query(
-      'SELECT * FROM bundles WHERE id = ? AND status = "active"',
+      "SELECT * FROM bundles WHERE id = ? AND status = 'active'",
       [bundle_id]
     );
     
@@ -132,10 +132,10 @@ router.post('/purchase', [
     
     const bundle = bundles[0];
     
-    // Check if user already has active subscription
+    // Check if user already has an active subscription for this bundle
     const existing = await query(
-      'SELECT * FROM subscriptions WHERE user_id = ? AND bundle_id = ? AND status = "active"',
-      [userId, bundle_id]
+      "SELECT * FROM subscriptions WHERE user_id = ? AND bundle_id = ? AND status = 'active'",
+      [user_id, bundle_id]
     );
     
     if (existing.length > 0) {

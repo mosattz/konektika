@@ -20,6 +20,12 @@ const analyticsRoutes = require('./routes/analytics');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// When running behind a proxy (Render, Nginx, etc.), trust the first proxy so
+// express-rate-limit and other middleware correctly read X-Forwarded-* headers.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: false,
