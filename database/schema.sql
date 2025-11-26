@@ -139,7 +139,7 @@ CREATE TABLE payments (
     -- Payment details
     amount DECIMAL(10,2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'TZS',
-    payment_method ENUM('mobile_money', 'bank_card', 'crypto', 'airtel_money', 'tigo_pesa', 'vodacom_mpesa') NOT NULL,
+    payment_method ENUM('mobile_money', 'bank_card', 'crypto', 'airtel_money', 'tigo_pesa', 'vodacom_mpesa', 'pesapal') NOT NULL,
     
     -- Payment gateway details
     transaction_id VARCHAR(255) UNIQUE,

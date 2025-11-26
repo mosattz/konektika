@@ -136,9 +136,24 @@ function MainNavigator() {
 }
 
 // Silence noisy library deprecation warnings that we cannot control directly
-LogBox.ignoreLogs([
-  'InteractionManager has been deprecated and will be removed in a future release',
-]);
+if (__DEV__) {
+  LogBox.ignoreLogs([
+    'InteractionManager has been deprecated',
+  ]);
+
+  // In React Native DevTools / remote debugging, some warnings still go through
+  // console.warn even when LogBox filters them. Hard-filter the specific
+  // InteractionManager deprecation message so it does not spam the console.
+  const originalWarn = console.warn;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  console.warn = (...args: any[]) => {
+    const message = typeof args[0] === 'string' ? args[0] : '';
+    if (message.includes('InteractionManager has been deprecated')) {
+      return;
+    }
+    return originalWarn(...args);
+  };
+}
 
 export default function App(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
