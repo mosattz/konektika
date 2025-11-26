@@ -89,7 +89,7 @@ router.post('/initiate', [
     // Check if user already has active subscription for this bundle
     const existingSubscriptions = await query(
       "SELECT * FROM subscriptions WHERE user_id = ? AND bundle_id = ? AND status = 'active' AND expires_at > NOW()",
-      [user_id, bundle_id]
+      [userId, bundle_id]
     );
 
     if (existingSubscriptions.length > 0) {

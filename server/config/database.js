@@ -13,9 +13,9 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true
+  // mysql2 v3 no longer accepts acquireTimeout/timeout/reconnect on pools.
+  // Use connectTimeout (ms) to avoid long hangs on initial connect.
+  connectTimeout: 60000,
 };
 
 async function connectDB() {
