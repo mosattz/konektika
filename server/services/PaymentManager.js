@@ -1,6 +1,7 @@
 const PesapalService = require('./PesapalService');
 const logger = require('../utils/logger');
 const { query } = require('../config/database');
+const vpnManager = require('../utils/vpnManager');
 
 /**
  * Payment Manager
@@ -205,7 +206,7 @@ class PaymentManager {
       // Calculate subscription expiry
       const expiresAt = new Date(Date.now() + (bundleData.duration_hours * 60 * 60 * 1000));
 
-      // Create subscription
+      // Create or update subscription
       await query(`
         INSERT INTO subscriptions (user_id, bundle_id, payment_id, status, expires_at)
         VALUES (?, ?, ?, 'active', ?)
@@ -221,6 +222,44 @@ class PaymentManager {
       );
 
       logger.info(`Subscription activated for user ${user_id}, bundle ${bundle_id}`);
+
+      // Ensure the user has at least one active VPN configuration for this bundle.
+      // To avoid duplicating configs, only generate a new one if there is no
+      // active (non-expired) config for (user, bundle).
+      try {
+        const existingConfigs = await query(
+          `SELECT id, status, expires_at
+             FROM vpn_configs
+            WHERE user_id = ? AND bundle_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1`,
+          [user_id, bundle_id]
+        );
+
+        const now = new Date();
+        const hasActiveConfig =
+          existingConfigs.length > 0 &&
+          existingConfigs[0].status === 'active' &&
+          existingConfigs[0].expires_at &&
+          new Date(existingConfigs[0].expires_at) > now;
+
+        if (!hasActiveConfig) {
+          logger.info(
+            `No active VPN config found for user ${user_id}, bundle ${bundle_id}; generating a new one.`,
+          );
+          await vpnManager.generateClientConfig(user_id, bundle_id);
+        } else {
+          logger.info(
+            `Active VPN config already exists for user ${user_id}, bundle ${bundle_id}; skipping generation.`,
+          );
+        }
+      } catch (vpnError) {
+        // Log VPN config generation issues but do not fail the payment flow.
+        logger.error(
+          `Failed to ensure VPN config for user ${user_id}, bundle ${bundle_id}:`,
+          vpnError,
+        );
+      }
 
     } catch (error) {
       logger.error('Failed to activate subscription:', error);

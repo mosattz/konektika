@@ -163,17 +163,28 @@ router.post('/generate-config', [
 // @access  Private
 router.get('/configs', authenticateToken, async (req, res) => {
   try {
+    // Return configs in a shape that matches what the mobile app expects:
+    // - id: number
+    // - user_id: number
+    // - bundle_id: number
+    // - config_data: string (ovpn_config)
+    // - expires_at: string
+    // - created_at: string
+    // - is_active: boolean
+    // Additional fields like bundle_name/server_ip are included for display.
     const configs = await query(`
-      SELECT 
+      SELECT
         vc.id,
-        vc.config_name,
+        vc.user_id,
+        vc.bundle_id,
+        vc.ovpn_config AS config_data,
+        vc.created_at,
+        vc.expires_at,
+        (vc.status = 'active') AS is_active,
         vc.server_ip,
         vc.server_port,
         vc.protocol,
-        vc.status,
-        vc.created_at,
-        vc.expires_at,
-        b.name as bundle_name
+        b.name AS bundle_name
       FROM vpn_configs vc
       JOIN bundles b ON vc.bundle_id = b.id
       WHERE vc.user_id = ?
