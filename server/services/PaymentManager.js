@@ -109,9 +109,14 @@ class PaymentManager {
       // Persist linkage between payments and PesaPal order reference
       const orderTrackingId = result.order_tracking_id;
 
+      // Keep payment_method aligned with the ENUM column in the DB to avoid
+      // truncation issues. The gateway/provider is still PesaPal; we only
+      // classify it in the DB under 'mobile_money'.
+      const dbPaymentMethod = 'mobile_money';
+
       await query(
         'UPDATE payments SET transaction_id = ?, payment_method = ? WHERE id = ?',
-        [orderTrackingId, 'pesapal', paymentId]
+        [orderTrackingId, dbPaymentMethod, paymentId]
       );
 
       return {

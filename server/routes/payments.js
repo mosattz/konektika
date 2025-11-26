@@ -110,10 +110,15 @@ router.post('/initiate', [
     }
 
     // Create payment record
+    // NOTE: We store a DB-safe payment_method value that is guaranteed to exist
+    // in the ENUM definition (e.g. 'mobile_money') to avoid truncation errors,
+    // while the actual gateway/provider is still PesaPal.
+    const dbPaymentMethod = 'mobile_money';
+
     const paymentResult = await query(
       `INSERT INTO payments (user_id, bundle_id, amount, currency, payment_method, status, created_at)
        VALUES (?, ?, ?, ?, ?, 'pending', NOW())`,
-      [userId, bundle_id, bundle.price, bundle.currency, 'pesapal']
+      [userId, bundle_id, bundle.price, bundle.currency, dbPaymentMethod]
     );
 
     const paymentId = paymentResult.insertId;
