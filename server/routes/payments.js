@@ -190,8 +190,11 @@ router.get('/status/:payment_id', authenticateToken, async (req, res) => {
 
     let payment = payments[0];
 
-    // If still pending and using PesaPal, optionally refresh status from provider
-    if (payment.status === 'pending' && payment.payment_method === 'pesapal' && payment.transaction_id) {
+    // If still pending and we have a provider transaction id, optionally
+    // refresh status from PesaPal. We no longer rely on payment_method
+    // being 'pesapal' in the DB, since we may store a more generic
+    // classification such as 'mobile_money'.
+    if (payment.status === 'pending' && payment.transaction_id) {
       try {
         const statusResult = await paymentManager.queryPaymentStatus(payment.transaction_id);
         const rawDesc = statusResult.payment_status_description || '';
