@@ -30,10 +30,10 @@ export type RootStackParamList = {
   Splash: undefined;
   Auth: undefined;
   Main: undefined;
-  BundleDetail: {bundleId: string; bundleName: string; bundleData?: import('./src/services/BundleService').Bundle};
-  Payment: {bundleId: string; bundleData: any};
-  PesapalCheckout: {paymentId: string; bundleName: string; redirectUrl: string};
-  PaymentStatus: {paymentId: string; bundleName: string};
+  BundleDetail: {bundleId: number; bundleName: string; bundleData?: import('./src/services/BundleService').Bundle};
+  Payment: {bundleId: number; bundleData: any};
+  PesapalCheckout: {paymentId: string; bundleId: number; bundleName: string; redirectUrl: string};
+  PaymentStatus: {paymentId: string; bundleId: number; bundleName: string};
 };
 
 export type AuthStackParamList = {

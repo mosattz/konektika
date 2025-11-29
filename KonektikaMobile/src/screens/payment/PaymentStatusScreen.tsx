@@ -13,7 +13,7 @@ type PaymentStatusRouteProp = RouteProp<RootStackParamList, 'PaymentStatus'>;
 const PaymentStatusScreen = () => {
   const route = useRoute<PaymentStatusRouteProp>();
   const navigation = useNavigation();
-  const {paymentId, bundleName} = route.params;
+  const {paymentId, bundleId, bundleName} = route.params;
  
   const [payment, setPayment] = useState<Payment | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +61,7 @@ const PaymentStatusScreen = () => {
  
           try {
             setGeneratingConfig(true);
-            const genResult = await VPNService.generateConfig(result.payment.bundle_id);
+            const genResult = await VPNService.generateConfig(bundleId);
  
             if (!genResult.success) {
               Alert.alert(
