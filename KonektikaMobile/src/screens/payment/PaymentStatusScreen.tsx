@@ -4,18 +4,35 @@ import {Card, Button, ActivityIndicator} from 'react-native-paper';
 import {useRoute, useNavigation, RouteProp} from '@react-navigation/native';
 import {theme} from '../../config/theme';
 import {PaymentService, Payment} from '../../services/PaymentService';
+import {VPNService} from '../../services/VPNService';
+import {AuthService} from '../../services/AuthService';
 import {RootStackParamList} from '../../../App';
-
+ 
 type PaymentStatusRouteProp = RouteProp<RootStackParamList, 'PaymentStatus'>;
-
+ 
 const PaymentStatusScreen = () => {
   const route = useRoute<PaymentStatusRouteProp>();
   const navigation = useNavigation();
   const {paymentId, bundleName} = route.params;
-
+ 
   const [payment, setPayment] = useState<Payment | null>(null);
   const [loading, setLoading] = useState(true);
   const [polling, setPolling] = useState(true);
+  const [generatingConfig, setGeneratingConfig] = useState(false);
+
+  const handleAuthError = async (message?: string) => {
+    const msg = message?.toLowerCase() || '';
+    if (
+      msg.includes('invalid token') ||
+      msg.includes('token has expired') ||
+      msg.includes('unauthorized')
+    ) {
+      await AuthService.logout();
+      Alert.alert('Session expired', 'Please log in again to continue.');
+      return true;
+    }
+    return false;
+  };
 
   useEffect(() => {
     checkPaymentStatus();
@@ -34,17 +51,60 @@ const PaymentStatusScreen = () => {
   const checkPaymentStatus = async () => {
     try {
       const result = await PaymentService.checkPaymentStatus(paymentId);
-
+ 
       if (result.success && result.payment) {
         setPayment(result.payment);
-
-        // Stop polling if payment is completed or failed
-        if (result.payment.status === 'completed' || result.payment.status === 'failed' || result.payment.status === 'cancelled') {
+ 
+        if (result.payment.status === 'completed') {
+          // Payment confirmed – stop polling and generate VPN config for this bundle
+          setPolling(false);
+ 
+          try {
+            setGeneratingConfig(true);
+            const genResult = await VPNService.generateConfig(result.payment.bundle_id);
+ 
+            if (!genResult.success) {
+              Alert.alert(
+                'VPN Setup',
+                genResult.error ||
+                  'Payment was successful, but we could not prepare your VPN configuration automatically. You can try again from the Connection tab.'
+              );
+            }
+          } catch (genError: any) {
+            console.error('Error generating VPN config after payment:', genError);
+            Alert.alert(
+              'VPN Setup',
+              genError?.message ||
+                'Payment was successful, but an error occurred while preparing your VPN configuration. Please try again from the Connection tab.'
+            );
+          } finally {
+            setGeneratingConfig(false);
+          }
+        } else if (
+          result.payment.status === 'failed' ||
+          result.payment.status === 'cancelled'
+        ) {
+          // Stop polling if payment is failed or cancelled
           setPolling(false);
         }
+      } else if (!result.success) {
+        setPolling(false);
+        if (!(await handleAuthError(result.error))) {
+          Alert.alert(
+            'Payment Status Error',
+            result.error || 'Failed to check payment status. Please try again later.'
+          );
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
+      setPolling(false);
       console.error('Error checking payment status:', error);
+      if (!(await handleAuthError(error.message))) {
+        Alert.alert(
+          'Error',
+          error.message || 'An error occurred while checking payment status'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -176,6 +236,13 @@ const PaymentStatusScreen = () => {
             <View style={styles.pollingContainer}>
               <ActivityIndicator size="small" color={theme.colors.primary} />
               <Text style={styles.pollingText}>Checking payment status...</Text>
+            </View>
+          )}
+
+          {payment?.status === 'completed' && generatingConfig && (
+            <View style={styles.pollingContainer}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text style={styles.pollingText}>Preparing your VPN configuration...</Text>
             </View>
           )}
         </Card.Content>
