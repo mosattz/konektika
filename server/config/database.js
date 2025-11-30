@@ -48,7 +48,10 @@ async function query(sql, params = []) {
     const [results] = await connection.execute(sql, params);
     return results;
   } catch (error) {
+    // Log full SQL and params to pinpoint issues like unknown columns (e.g. 'active').
     console.error('Database query error:', error.message);
+    console.error('  SQL:', sql);
+    console.error('  Params:', JSON.stringify(params));
     throw error;
   }
 }
