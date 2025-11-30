@@ -271,19 +271,26 @@ router.get('/status/:payment_id', authenticateToken, async (req, res) => {
 router.get('/history', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+
+    // Sanitize pagination values and inline them into the SQL to avoid
+    // MySQL "Incorrect arguments to mysqld_stmt_execute" when using
+    // bound parameters for LIMIT/OFFSET.
+    const rawPage = parseInt(req.query.page, 10);
+    const rawLimit = parseInt(req.query.limit, 10);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 && rawLimit <= 100 ? rawLimit : 10;
     const offset = (page - 1) * limit;
 
     // Get payment history
-    const payments = await query(`
-      SELECT p.*, b.name as bundle_name, b.data_limit, b.duration_hours
-      FROM payments p
-      LEFT JOIN bundles b ON p.bundle_id = b.id
-      WHERE p.user_id = ?
-      ORDER BY p.created_at DESC
-      LIMIT ? OFFSET ?
-    `, [userId, limit, offset]);
+    const payments = await query(
+      `SELECT p.*, b.name as bundle_name, b.data_limit, b.duration_hours
+         FROM payments p
+         LEFT JOIN bundles b ON p.bundle_id = b.id
+        WHERE p.user_id = ?
+        ORDER BY p.created_at DESC
+        LIMIT ${limit} OFFSET ${offset}`,
+      [userId]
+    );
 
     // Get total count
     const countResult = await query(

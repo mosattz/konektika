@@ -20,6 +20,7 @@ import BundleDetailScreen from './src/screens/bundles/BundleDetailScreen';
 import PaymentScreen from './src/screens/payment/PaymentScreen';
 import PaymentStatusScreen from './src/screens/payment/PaymentStatusScreen';
 import PesapalCheckoutScreen from './src/screens/payment/PesapalCheckoutScreen';
+import PaymentHistoryScreen from './src/screens/payment/PaymentHistoryScreen';
 
 // Services
 import {AuthService} from './src/services/AuthService';
@@ -34,6 +35,7 @@ export type RootStackParamList = {
   Payment: {bundleId: number; bundleData: any};
   PesapalCheckout: {paymentId: string; bundleId: number; bundleName: string; redirectUrl: string};
   PaymentStatus: {paymentId: string; bundleId: number; bundleName: string};
+  PaymentHistory: undefined;
 };
 
 export type AuthStackParamList = {
@@ -259,6 +261,16 @@ export default function App(): React.JSX.Element {
                   headerStyle: {backgroundColor: theme.colors.primary},
                   headerTintColor: '#FFFFFF',
                   title: 'Payment Status',
+                }}
+              />
+              <Stack.Screen 
+                name="PaymentHistory" 
+                component={PaymentHistoryScreen}
+                options={{
+                  headerShown: true,
+                  headerStyle: {backgroundColor: theme.colors.primary},
+                  headerTintColor: '#FFFFFF',
+                  title: 'Payment History',
                 }}
               />
             </>
