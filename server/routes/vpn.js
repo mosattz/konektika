@@ -124,7 +124,7 @@ router.post('/generate-config', [
 
     // Check if user has access to this bundle
     const bundles = await query(
-      'SELECT * FROM bundles WHERE id = ? AND (owner_id = ? OR id IN (SELECT bundle_id FROM subscriptions WHERE user_id = ? AND status = "active"))',
+      "SELECT * FROM bundles WHERE id = ? AND (owner_id = ? OR id IN (SELECT bundle_id FROM subscriptions WHERE user_id = ? AND status = 'active'))",
       [bundle_id, userId, userId]
     );
 
