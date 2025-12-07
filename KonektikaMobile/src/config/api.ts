@@ -4,8 +4,8 @@ export const API_CONFIG = {
   // In development, use the host machine's LAN IP so both emulator and physical devices can reach it.
   // Updated automatically to match your current WiFi IPv4 (see `ipconfig`).
   BASE_URL: __DEV__
-    ? 'http://10.165.221.165:3000/api' // Dev: local server for testing
-    : 'https://konektika.online/api', // Production URL
+    ? 'https://konektika.onrender.com/api' // Dev: Render backend
+    : 'https://konektika.onrender.com/api', // Production: Render backend
   
   TIMEOUT: 30000, // 30 seconds
   
