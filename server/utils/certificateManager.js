@@ -219,11 +219,16 @@ class CertificateManager {
   async generateTLSAuthKey() {
     return new Promise((resolve, reject) => {
       const taPath = path.join(this.keysDir, 'ta.key');
-      const cmd = `"C:\\Program Files\\OpenVPN\\bin\\openvpn.exe" --genkey secret "${taPath}"`;
+
+      // Reuse the same OPENVPN_EXECUTABLE convention as vpnManager so the path
+      // can be overridden via environment on different Windows hosts.
+      const openvpnExecutable = process.env.OPENVPN_EXECUTABLE || 'C:\\\Program Files\\\OpenVPN\\\bin\\\openvpn.exe';
+      const cmd = `"${openvpnExecutable}" --genkey secret "${taPath}"`;
       
       exec(cmd, (error, stdout, stderr) => {
         if (error) {
           logger.error('TLS auth key generation failed:', error);
+          logger.error('OpenVPN executable:', openvpnExecutable);
           reject(error);
         } else {
           logger.info('TLS auth key generated successfully');

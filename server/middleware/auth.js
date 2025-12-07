@@ -6,7 +6,15 @@ require('dotenv').config();
 // Middleware to verify JWT tokens
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  let token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  // Handle cases where the token might be wrapped in quotes: Bearer "TOKEN"
+  if (typeof token === 'string') {
+    token = token.trim();
+    if (token.startsWith('"') && token.endsWith('"')) {
+      token = token.slice(1, -1);
+    }
+  }
 
   if (!token) {
     return res.status(401).json({
@@ -17,7 +25,16 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     // Verify the JWT token
-    const jwtSecret = process.env.JWT_SECRET || 'konektika_jwt_secret_key_2024';
+    const jwtSecret = process.env.JWT_SECRET;
+
+    if (!jwtSecret) {
+      logger.error('JWT_SECRET is not set in environment variables');
+      return res.status(500).json({
+        success: false,
+        message: 'Server configuration error: JWT secret not set'
+      });
+    }
+
     const decoded = jwt.verify(token, jwtSecret);
     
     // Get user from database to ensure they still exist and are active

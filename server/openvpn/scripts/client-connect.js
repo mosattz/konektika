@@ -8,6 +8,8 @@
 // - ifconfig_pool_remote_ip: VPN IP assigned to client
 
 const http = require('http');
+const https = require('https');
+const { URL } = require('url');
 const querystring = require('querystring');
 
 // Get environment variables from OpenVPN
@@ -42,19 +44,29 @@ const connectionData = querystring.stringify({
 });
 
 // Send connection data to Konektika API
+// The base URL is configurable so the API can run inside Kubernetes while
+// OpenVPN remains on a separate Windows host.
+const apiBase = process.env.KONEKTIKA_API_URL || 'http://localhost:3000';
+const trackingSecret = process.env.OPENVPN_TRACKING_SECRET || '';
+
+const baseUrl = new URL('/api/vpn/track-connection', apiBase);
+const isHttps = baseUrl.protocol === 'https:';
+const client = isHttps ? https : http;
+
 const options = {
-  hostname: 'localhost',
-  port: 3000,
-  path: '/api/vpn/track-connection',
+  hostname: baseUrl.hostname,
+  port: baseUrl.port || (isHttps ? 443 : 80),
+  path: baseUrl.pathname + baseUrl.search,
   method: 'POST',
   headers: {
     'Content-Type': 'application/x-www-form-urlencoded',
     'Content-Length': Buffer.byteLength(connectionData),
-    'X-OpenVPN-Script': 'client-connect'
+    'X-OpenVPN-Script': 'client-connect',
+    ...(trackingSecret ? { 'X-Tracking-Secret': trackingSecret } : {})
   }
 };
 
-const req = http.request(options, (res) => {
+const req = client.request(options, (res) => {
   console.log(`Connection tracking response: ${res.statusCode}`);
   res.on('data', (chunk) => {
     console.log(`Response: ${chunk}`);

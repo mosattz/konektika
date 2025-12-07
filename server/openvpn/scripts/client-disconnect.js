@@ -4,6 +4,8 @@
 // This script is called when a client disconnects from the VPN
 
 const http = require('http');
+const https = require('https');
+const { URL } = require('url');
 const querystring = require('querystring');
 const fs = require('fs');
 const path = require('path');
@@ -43,19 +45,27 @@ const disconnectionData = querystring.stringify({
 });
 
 // Send disconnection data to Konektika API
+const apiBase = process.env.KONEKTIKA_API_URL || 'http://localhost:3000';
+const trackingSecret = process.env.OPENVPN_TRACKING_SECRET || '';
+
+const baseUrl = new URL('/api/vpn/track-disconnection', apiBase);
+const isHttps = baseUrl.protocol === 'https:';
+const client = isHttps ? https : http;
+
 const options = {
-  hostname: 'localhost',
-  port: 3000,
-  path: '/api/vpn/track-disconnection',
+  hostname: baseUrl.hostname,
+  port: baseUrl.port || (isHttps ? 443 : 80),
+  path: baseUrl.pathname + baseUrl.search,
   method: 'POST',
   headers: {
     'Content-Type': 'application/x-www-form-urlencoded',
     'Content-Length': Buffer.byteLength(disconnectionData),
-    'X-OpenVPN-Script': 'client-disconnect'
+    'X-OpenVPN-Script': 'client-disconnect',
+    ...(trackingSecret ? { 'X-Tracking-Secret': trackingSecret } : {})
   }
 };
 
-const req = http.request(options, (res) => {
+const req = client.request(options, (res) => {
   console.log(`Disconnection tracking response: ${res.statusCode}`);
   res.on('data', (chunk) => {
     console.log(`Response: ${chunk}`);

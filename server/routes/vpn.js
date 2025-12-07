@@ -8,6 +8,31 @@ const logger = require('../utils/logger');
 
 const router = express.Router();
 
+// Shared secret used by the OpenVPN connect/disconnect scripts when calling
+// tracking endpoints from the Windows VPN server. This allows the API to run
+// in Kubernetes while OpenVPN remains on a separate Windows host.
+const TRACKING_SECRET = process.env.OPENVPN_TRACKING_SECRET || null;
+
+function verifyTrackingSecret(req, res, next) {
+  if (!TRACKING_SECRET) {
+    return res.status(503).json({
+      success: false,
+      message: 'OpenVPN tracking secret is not configured on the server'
+    });
+  }
+
+  const headerSecret = req.headers['x-tracking-secret'];
+  if (headerSecret !== TRACKING_SECRET) {
+    logger.warn('Invalid tracking secret used for VPN tracking endpoint');
+    return res.status(403).json({
+      success: false,
+      message: 'Forbidden'
+    });
+  }
+
+  next();
+}
+
 // @route   GET /api/vpn/status
 // @desc    Get VPN server status
 // @access  Private (Owner only)
@@ -391,6 +416,113 @@ router.post('/disconnect/:connection_id', authenticateToken, async (req, res) =>
     res.status(500).json({
       success: false,
       message: 'Failed to disconnect VPN client',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @route   POST /api/vpn/track-connection
+// @desc    Track VPN connection from OpenVPN client-connect script
+// @access  Private (OpenVPN server via shared secret)
+router.post('/track-connection', verifyTrackingSecret, async (req, res) => {
+  try {
+    const { user_id, bundle_id, client_ip, client_name, bytes_sent, bytes_received } = req.body;
+
+    const userId = parseInt(user_id, 10);
+    const bundleId = parseInt(bundle_id, 10);
+
+    if (!Number.isInteger(userId) || !Number.isInteger(bundleId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user_id or bundle_id'
+      });
+    }
+
+    // Find most recent active VPN config for this user + bundle
+    const configs = await query(
+      `SELECT id FROM vpn_configs
+       WHERE user_id = ? AND bundle_id = ? AND status = 'active'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId, bundleId]
+    );
+
+    if (configs.length === 0) {
+      logger.warn(`track-connection: No active vpn_config for user ${userId}, bundle ${bundleId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'No active VPN configuration found for this user and bundle'
+      });
+    }
+
+    const vpnConfigId = configs[0].id;
+
+    await vpnManager.trackConnection(vpnConfigId, userId, bundleId, client_ip);
+
+    res.json({
+      success: true,
+      message: 'VPN connection tracked'
+    });
+  } catch (error) {
+    logger.error('OpenVPN track-connection error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to track VPN connection',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @route   POST /api/vpn/track-disconnection
+// @desc    Track VPN disconnection from OpenVPN client-disconnect script
+// @access  Private (OpenVPN server via shared secret)
+router.post('/track-disconnection', verifyTrackingSecret, async (req, res) => {
+  try {
+    const { user_id, bundle_id, client_ip, bytes_sent, bytes_received, duration } = req.body;
+
+    const userId = parseInt(user_id, 10);
+    const bundleId = parseInt(bundle_id, 10);
+    const sent = parseInt(bytes_sent, 10) || 0;
+    const received = parseInt(bytes_received, 10) || 0;
+
+    if (!Number.isInteger(userId) || !Number.isInteger(bundleId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user_id or bundle_id'
+      });
+    }
+
+    // Find latest active connection for this user/bundle/IP
+    const connections = await query(
+      `SELECT id FROM vpn_connections
+       WHERE user_id = ? AND bundle_id = ? AND client_ip = ? AND status = 'connected'
+       ORDER BY connected_at DESC
+       LIMIT 1`,
+      [userId, bundleId, client_ip]
+    );
+
+    if (connections.length === 0) {
+      logger.warn(`track-disconnection: No active connection for user ${userId}, bundle ${bundleId}, ip ${client_ip}`);
+      return res.status(404).json({
+        success: false,
+        message: 'No active VPN connection found'
+      });
+    }
+
+    const connectionId = connections[0].id;
+
+    await vpnManager.updateConnectionStats(connectionId, sent, received);
+    await vpnManager.disconnectClient(connectionId, 'Client disconnected (OpenVPN event)');
+
+    res.json({
+      success: true,
+      message: 'VPN disconnection tracked'
+    });
+  } catch (error) {
+    logger.error('OpenVPN track-disconnection error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to track VPN disconnection',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

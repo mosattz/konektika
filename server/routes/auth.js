@@ -10,9 +10,14 @@ const router = express.Router();
 
 // Helper function to generate JWT token
 const generateToken = (userId, email) => {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET is not set in environment variables');
+  }
+
   return jwt.sign(
     { userId, email },
-    process.env.JWT_SECRET || 'konektika_jwt_secret_key_2024',
+    jwtSecret,
     { expiresIn: process.env.JWT_EXPIRE || '24h' }
   );
 };
