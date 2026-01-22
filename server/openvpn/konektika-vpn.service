@@ -1,0 +1,14 @@
+[Unit]
+Description=Konektika OpenVPN Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/mosatinc/mosatinc/konektika/server/openvpn
+ExecStart=/usr/sbin/openvpn --config /home/mosatinc/mosatinc/konektika/server/openvpn/server.conf
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
