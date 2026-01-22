@@ -15,3 +15,8 @@ build/
 dist/
 .android/
 .ios/
+
+# Android NDK
+KonektikaMobile/android/android-ndk-r*/
+*.zip
+*.tar.gz
