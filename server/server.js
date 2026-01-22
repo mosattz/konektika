@@ -7,7 +7,7 @@ require('dotenv').config();
 const { connectDB } = require('./config/database');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
-const vpnManager = require('./utils/vpnManager');
+const wireguardManager = require('./utils/wireguardManager');
 
 // Route imports
 const authRoutes = require('./routes/auth');
@@ -129,12 +129,10 @@ app.get('/health', (req, res) => {
 });
 
 // VPN health endpoint: summarizes VPN server status as seen from this API.
-// NOTE: when the API is running inside Kubernetes and the OpenVPN server is on
-// a separate Windows host, some checks (like local OpenVPN service status)
-// will report as not installed/not running because they are host-local.
+// NOTE: WireGuard server status is checked locally on this host.
 app.get('/health/vpn', async (req, res) => {
   try {
-    const status = await vpnManager.getServerStatus();
+    const status = await wireguardManager.getServerStatus();
 
     res.status(200).json({
       status: 'OK',

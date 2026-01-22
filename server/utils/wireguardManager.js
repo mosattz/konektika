@@ -131,11 +131,11 @@ PersistentKeepalive = 25
    */
   async addPeer(publicKey, allowedIP) {
     try {
-      const command = `wg set wg0 peer ${publicKey} allowed-ips ${allowedIP}`;
+      const command = `sudo wg set wg0 peer ${publicKey} allowed-ips ${allowedIP}`;
       await execAsync(command);
       
       // Save configuration
-      await execAsync('wg-quick save wg0');
+      await execAsync('sudo wg-quick save wg0');
       
       logger.info(`Added WireGuard peer: ${publicKey} -> ${allowedIP}`);
       return { success: true };
@@ -150,11 +150,11 @@ PersistentKeepalive = 25
    */
   async removePeer(publicKey) {
     try {
-      const command = `wg set wg0 peer ${publicKey} remove`;
+      const command = `sudo wg set wg0 peer ${publicKey} remove`;
       await execAsync(command);
       
       // Save configuration
-      await execAsync('wg-quick save wg0');
+      await execAsync('sudo wg-quick save wg0');
       
       logger.info(`Removed WireGuard peer: ${publicKey}`);
       return { success: true };
@@ -169,7 +169,7 @@ PersistentKeepalive = 25
    */
   async getServerStatus() {
     try {
-      const { stdout } = await execAsync('wg show wg0');
+      const { stdout } = await execAsync('sudo wg show wg0');
       
       return {
         running: true,
@@ -220,6 +220,97 @@ PersistentKeepalive = 25
       return { success: true };
     } catch (error) {
       logger.error('Failed to revoke config:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get active VPN connections
+   */
+  async getActiveConnections() {
+    try {
+      const connections = await query(`
+        SELECT 
+          vc.id,
+          vc.user_id,
+          vc.bundle_id,
+          vc.client_ip,
+          vc.connected_at,
+          vc.bytes_sent,
+          vc.bytes_received,
+          vc.status,
+          u.username,
+          u.email,
+          b.name as bundle_name
+        FROM vpn_connections vc
+        JOIN users u ON vc.user_id = u.id
+        JOIN bundles b ON vc.bundle_id = b.id
+        WHERE vc.status = 'connected'
+        ORDER BY vc.connected_at DESC
+      `);
+
+      return connections;
+    } catch (error) {
+      logger.error('Failed to get active connections:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Track VPN connection
+   */
+  async trackConnection(vpnConfigId, userId, bundleId, clientIp) {
+    try {
+      await query(`
+        INSERT INTO vpn_connections (
+          vpn_config_id, user_id, bundle_id, client_ip, 
+          connected_at, status
+        )
+        VALUES (?, ?, ?, ?, NOW(), 'connected')
+      `, [vpnConfigId, userId, bundleId, clientIp]);
+
+      logger.info(`Tracked VPN connection: user ${userId}, bundle ${bundleId}, IP ${clientIp}`);
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to track connection:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update connection statistics
+   */
+  async updateConnectionStats(connectionId, bytesSent, bytesReceived) {
+    try {
+      await query(`
+        UPDATE vpn_connections 
+        SET bytes_sent = ?, bytes_received = ?
+        WHERE id = ?
+      `, [bytesSent, bytesReceived, connectionId]);
+
+      logger.info(`Updated connection stats: ${connectionId}`);
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to update connection stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Disconnect VPN client
+   */
+  async disconnectClient(connectionId, reason = 'Manual disconnect') {
+    try {
+      await query(`
+        UPDATE vpn_connections 
+        SET status = 'disconnected', disconnected_at = NOW(), disconnect_reason = ?
+        WHERE id = ?
+      `, [reason, connectionId]);
+
+      logger.info(`Disconnected VPN client: ${connectionId}, reason: ${reason}`);
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to disconnect client:', error);
       throw error;
     }
   }
