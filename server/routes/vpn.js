@@ -1,19 +1,41 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { authenticateToken, requireOwner } = require('../middleware/auth');
-const vpnManager = require('../utils/vpnManager');
-const certificateManager = require('../utils/certificateManager');
+const wireguardManager = require('../utils/wireguardManager');
 const { query } = require('../config/database');
 const logger = require('../utils/logger');
 
 const router = express.Router();
+
+// Shared secret for WireGuard server communication
+const TRACKING_SECRET = process.env.WG_TRACKING_SECRET || null;
+
+function verifyTrackingSecret(req, res, next) {
+  if (!TRACKING_SECRET) {
+    return res.status(503).json({
+      success: false,
+      message: 'WireGuard tracking secret is not configured on the server'
+    });
+  }
+
+  const headerSecret = req.headers['x-tracking-secret'];
+  if (headerSecret !== TRACKING_SECRET) {
+    logger.warn('Invalid tracking secret used for VPN tracking endpoint');
+    return res.status(403).json({
+      success: false,
+      message: 'Forbidden'
+    });
+  }
+
+  next();
+}
 
 // @route   GET /api/vpn/status
 // @desc    Get VPN server status
 // @access  Private (Owner only)
 router.get('/status', authenticateToken, requireOwner, async (req, res) => {
   try {
-    const status = await vpnManager.getServerStatus();
+    const status = await wireguardManager.getServerStatus();
     
     res.json({
       success: true,
@@ -30,71 +52,7 @@ router.get('/status', authenticateToken, requireOwner, async (req, res) => {
   }
 });
 
-// @route   POST /api/vpn/initialize
-// @desc    Initialize VPN server directories and configuration
-// @access  Private (Owner only)
-router.post('/initialize', authenticateToken, requireOwner, async (req, res) => {
-  try {
-    const result = await vpnManager.initialize();
-    
-    res.json({
-      success: true,
-      message: 'VPN server initialized successfully with real certificates',
-      data: result
-    });
-  } catch (error) {
-    logger.error('VPN initialization error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to initialize VPN server',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// @route   GET /api/vpn/certificates/status
-// @desc    Get certificate status
-// @access  Private (Owner only)
-router.get('/certificates/status', authenticateToken, requireOwner, async (req, res) => {
-  try {
-    const status = await certificateManager.getCertificateStatus();
-    
-    res.json({
-      success: true,
-      message: 'Certificate status retrieved',
-      data: status
-    });
-  } catch (error) {
-    logger.error('Certificate status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get certificate status',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// @route   POST /api/vpn/certificates/generate-server
-// @desc    Generate server certificate
-// @access  Private (Owner only)
-router.post('/certificates/generate-server', authenticateToken, requireOwner, async (req, res) => {
-  try {
-    const result = await certificateManager.generateServerCertificate();
-    
-    res.json({
-      success: true,
-      message: 'Server certificate generated successfully',
-      data: result
-    });
-  } catch (error) {
-    logger.error('Server certificate generation error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to generate server certificate',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
+// Certificate management routes removed - WireGuard uses simple key pairs instead
 
 // @route   POST /api/vpn/generate-config
 // @desc    Generate VPN client configuration
@@ -135,8 +93,8 @@ router.post('/generate-config', [
       });
     }
 
-    // Generate VPN configuration
-    const config = await vpnManager.generateClientConfig(userId, bundle_id, client_name);
+    // Generate WireGuard configuration
+    const config = await wireguardManager.generateClientConfig(userId, bundle_id, client_name);
     
     res.json({
       success: true,
@@ -271,7 +229,7 @@ router.delete('/config/:id', authenticateToken, async (req, res) => {
     }
     
     // Revoke configuration
-    await vpnManager.revokeClientConfig(configId);
+    await wireguardManager.revokeClientConfig(configId);
     
     res.json({
       success: true,
@@ -293,7 +251,7 @@ router.delete('/config/:id', authenticateToken, async (req, res) => {
 // @access  Private (Owner only)
 router.get('/connections', authenticateToken, requireOwner, async (req, res) => {
   try {
-    const connections = await vpnManager.getActiveConnections();
+    const connections = await wireguardManager.getActiveConnections();
     
     res.json({
       success: true,
@@ -340,7 +298,7 @@ router.post('/connect', [
     const userId = req.user.id;
 
     // Track the connection
-    await vpnManager.trackConnection(vpn_config_id, userId, bundle_id, client_ip);
+    await wireguardManager.trackConnection(vpn_config_id, userId, bundle_id, client_ip);
     
     res.json({
       success: true,
@@ -379,7 +337,7 @@ router.post('/disconnect/:connection_id', authenticateToken, async (req, res) =>
       });
     }
     
-    await vpnManager.disconnectClient(connectionId, reason);
+    await wireguardManager.disconnectClient(connectionId, reason);
     
     res.json({
       success: true,
@@ -391,6 +349,113 @@ router.post('/disconnect/:connection_id', authenticateToken, async (req, res) =>
     res.status(500).json({
       success: false,
       message: 'Failed to disconnect VPN client',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @route   POST /api/vpn/track-connection
+// @desc    Track VPN connection from OpenVPN client-connect script
+// @access  Private (OpenVPN server via shared secret)
+router.post('/track-connection', verifyTrackingSecret, async (req, res) => {
+  try {
+    const { user_id, bundle_id, client_ip, client_name, bytes_sent, bytes_received } = req.body;
+
+    const userId = parseInt(user_id, 10);
+    const bundleId = parseInt(bundle_id, 10);
+
+    if (!Number.isInteger(userId) || !Number.isInteger(bundleId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user_id or bundle_id'
+      });
+    }
+
+    // Find most recent active VPN config for this user + bundle
+    const configs = await query(
+      `SELECT id FROM vpn_configs
+       WHERE user_id = ? AND bundle_id = ? AND status = 'active'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId, bundleId]
+    );
+
+    if (configs.length === 0) {
+      logger.warn(`track-connection: No active vpn_config for user ${userId}, bundle ${bundleId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'No active VPN configuration found for this user and bundle'
+      });
+    }
+
+    const vpnConfigId = configs[0].id;
+
+    await wireguardManager.trackConnection(vpnConfigId, userId, bundleId, client_ip);
+
+    res.json({
+      success: true,
+      message: 'VPN connection tracked'
+    });
+  } catch (error) {
+    logger.error('OpenVPN track-connection error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to track VPN connection',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @route   POST /api/vpn/track-disconnection
+// @desc    Track VPN disconnection from OpenVPN client-disconnect script
+// @access  Private (OpenVPN server via shared secret)
+router.post('/track-disconnection', verifyTrackingSecret, async (req, res) => {
+  try {
+    const { user_id, bundle_id, client_ip, bytes_sent, bytes_received, duration } = req.body;
+
+    const userId = parseInt(user_id, 10);
+    const bundleId = parseInt(bundle_id, 10);
+    const sent = parseInt(bytes_sent, 10) || 0;
+    const received = parseInt(bytes_received, 10) || 0;
+
+    if (!Number.isInteger(userId) || !Number.isInteger(bundleId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user_id or bundle_id'
+      });
+    }
+
+    // Find latest active connection for this user/bundle/IP
+    const connections = await query(
+      `SELECT id FROM vpn_connections
+       WHERE user_id = ? AND bundle_id = ? AND client_ip = ? AND status = 'connected'
+       ORDER BY connected_at DESC
+       LIMIT 1`,
+      [userId, bundleId, client_ip]
+    );
+
+    if (connections.length === 0) {
+      logger.warn(`track-disconnection: No active connection for user ${userId}, bundle ${bundleId}, ip ${client_ip}`);
+      return res.status(404).json({
+        success: false,
+        message: 'No active VPN connection found'
+      });
+    }
+
+    const connectionId = connections[0].id;
+
+    await wireguardManager.updateConnectionStats(connectionId, sent, received);
+    await wireguardManager.disconnectClient(connectionId, 'Client disconnected (OpenVPN event)');
+
+    res.json({
+      success: true,
+      message: 'VPN disconnection tracked'
+    });
+  } catch (error) {
+    logger.error('OpenVPN track-disconnection error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to track VPN disconnection',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

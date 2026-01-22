@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: konektika-server
+  labels:
+    app: konektika-server
+spec:
+  type: ClusterIP
+  selector:
+    app: konektika-server
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP

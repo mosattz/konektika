@@ -7,6 +7,7 @@ require('dotenv').config();
 const { connectDB } = require('./config/database');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
+const vpnManager = require('./utils/vpnManager');
 
 // Route imports
 const authRoutes = require('./routes/auth');
@@ -54,7 +55,8 @@ const corsOptions = {
     // Add your production domains here
     const allowedOrigins = [
       'https://konektika.com',
-      'https://app.konektika.com'
+      'https://app.konektika.com',
+      'https://konektika.online'
     ];
     
     if (allowedOrigins.includes(origin)) {
@@ -124,6 +126,31 @@ app.get('/health', (req, res) => {
     version: '1.0.0',
     service: 'Konektika VPN Server'
   });
+});
+
+// VPN health endpoint: summarizes VPN server status as seen from this API.
+// NOTE: when the API is running inside Kubernetes and the OpenVPN server is on
+// a separate Windows host, some checks (like local OpenVPN service status)
+// will report as not installed/not running because they are host-local.
+app.get('/health/vpn', async (req, res) => {
+  try {
+    const status = await vpnManager.getServerStatus();
+
+    res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      vpn: status
+    });
+  } catch (error) {
+    logger.error('VPN health check failed:', error);
+    res.status(500).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'VPN health check failed'
+    });
+  }
 });
 
 // API Routes
