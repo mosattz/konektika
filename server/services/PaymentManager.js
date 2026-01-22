@@ -1,7 +1,7 @@
 const PesapalService = require('./PesapalService');
-const logger = require('../utils/logger');
 const { query } = require('../config/database');
-const vpnManager = require('../utils/vpnManager');
+const logger = require('../utils/logger');
+const wireguardManager = require('../utils/wireguardManager');
 
 /**
  * Payment Manager
@@ -247,7 +247,7 @@ class PaymentManager {
           logger.info(
             `No active VPN config found for user ${user_id}, bundle ${bundle_id}; generating a new one.`,
           );
-          await vpnManager.generateClientConfig(user_id, bundle_id);
+          await wireguardManager.generateClientConfig(user_id, bundle_id);
         } else {
           logger.info(
             `Active VPN config already exists for user ${user_id}, bundle ${bundle_id}; skipping generation.`,
