@@ -32,8 +32,8 @@ router.post('/register', [
     .normalizeEmail()
     .withMessage('Valid email is required'),
   body('phone')
-    .isMobilePhone('any')
-    .withMessage('Valid phone number is required'),
+    .matches(/^\+?[0-9]{10,15}$/)
+    .withMessage('Valid phone number is required (10-15 digits)'),
   body('password')
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters'),
