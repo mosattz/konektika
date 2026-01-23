@@ -31,26 +31,24 @@ const logger = winston.createLogger({
   ],
 });
 
-// If we're not in production, log to the `console` with a simple format
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple(),
-      winston.format.printf(({ timestamp, level, message, service, ...meta }) => {
-        let metaString = '';
-        if (Object.keys(meta).length) {
-          try {
-            metaString = JSON.stringify(meta);
-          } catch (err) {
-            metaString = '[unserializable meta]';
-          }
+// Always log to console (for both development and production)
+logger.add(new winston.transports.Console({
+  format: winston.format.combine(
+    winston.format.colorize(),
+    winston.format.simple(),
+    winston.format.printf(({ timestamp, level, message, service, ...meta }) => {
+      let metaString = '';
+      if (Object.keys(meta).length) {
+        try {
+          metaString = JSON.stringify(meta);
+        } catch (err) {
+          metaString = '[unserializable meta]';
         }
-        return `${timestamp} [${service}] ${level}: ${message} ${metaString}`;
-      })
-    )
-  }));
-}
+      }
+      return `${timestamp} [${service}] ${level}: ${message} ${metaString}`;
+    })
+  )
+}));
 
 // Create a stream object for integration with Express
 logger.stream = {
