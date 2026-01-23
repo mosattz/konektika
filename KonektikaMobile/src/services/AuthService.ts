@@ -64,12 +64,18 @@ export class AuthService {
       );
 
       console.log('AuthService.login raw response:', JSON.stringify(response, null, 2));
+      console.log('Response success:', response.success);
+      console.log('Response data:', response.data);
+      console.log('Response error:', response.error);
 
       // Handle different possible backend response shapes
       const payload = response.data as any;
       const token = payload?.token ?? payload?.accessToken ?? payload?.data?.token;
       const user: User | undefined =
         payload?.user ?? payload?.data?.user ?? payload?.data?.userData ?? payload?.data?.user_profile;
+      
+      console.log('Extracted token:', token ? 'present' : 'missing');
+      console.log('Extracted user:', user ? JSON.stringify(user) : 'missing');
 
       if (response.success && token && user) {
         // Store token and user data
