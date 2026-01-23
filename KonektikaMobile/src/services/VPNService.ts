@@ -9,6 +9,10 @@ export interface VPNConfig {
   expires_at: string;
   created_at: string;
   is_active: boolean;
+  bundle_name?: string;
+  server_ip?: string;
+  server_port?: string;
+  protocol?: string;
 }
 
 export interface VPNServerStatus {
@@ -175,11 +179,11 @@ export class VPNService {
         };
       }
 
-      // Return config data and suggested filename
+      // Return config data and suggested filename (WireGuard format)
       return {
         success: true,
         data: config.config_data,
-        filename: `konektika_vpn_${configId}.ovpn`,
+        filename: `konektika_vpn_${configId}.conf`,
       };
     } catch (error: any) {
       console.error('Download VPN config error:', error);
@@ -191,14 +195,16 @@ export class VPNService {
   }
 
   /**
-   * Parse OpenVPN config to extract key information
+   * Parse WireGuard config to extract key information
    */
   static parseConfigInfo(configData: string): {
     server?: string;
     port?: string;
     protocol?: string;
   } {
-    const info: {server?: string; port?: string; protocol?: string} = {};
+    const info: {server?: string; port?: string; protocol?: string} = {
+      protocol: 'WireGuard', // WireGuard always uses UDP
+    };
 
     try {
       const lines = configData.split('\n');
@@ -206,25 +212,17 @@ export class VPNService {
       for (const line of lines) {
         const trimmed = line.trim();
         
-        // Extract remote server info
-        if (trimmed.startsWith('remote ')) {
-          const parts = trimmed.split(/\s+/);
-          if (parts.length >= 3) {
-            info.server = parts[1];
-            info.port = parts[2];
-          }
-        }
-        
-        // Extract protocol
-        if (trimmed.startsWith('proto ')) {
-          const parts = trimmed.split(/\s+/);
-          if (parts.length >= 2) {
-            info.protocol = parts[1].toUpperCase();
+        // Extract endpoint (server:port) from WireGuard config
+        if (trimmed.startsWith('Endpoint')) {
+          const match = trimmed.match(/Endpoint\s*=\s*([^:]+):(\d+)/);
+          if (match) {
+            info.server = match[1];
+            info.port = match[2];
           }
         }
       }
     } catch (error) {
-      console.error('Error parsing config:', error);
+      console.error('Error parsing WireGuard config:', error);
     }
 
     return info;

@@ -6,8 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Share,
-  Platform,
   RefreshControl,
 } from 'react-native';
 import {Card, Button, ActivityIndicator, Chip, FAB} from 'react-native-paper';
@@ -20,10 +18,31 @@ const ConnectionScreen = () => {
   const [configs, setConfigs] = useState<VPNConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
 
   useEffect(() => {
     loadConfigs();
   }, []);
+
+  // Auto-redirect to VPN connection screen if user has an active config
+  useEffect(() => {
+    if (!loading && configs.length > 0 && !hasRedirected) {
+      // Find the most recent active config
+      const activeConfig = configs.find(config => {
+        const isExpired = new Date(config.expires_at) < new Date();
+        return config.is_active && !isExpired;
+      });
+
+      if (activeConfig) {
+        setHasRedirected(true);
+        // Navigate to VPN Connection screen with the active config
+        navigation.navigate('VPNConnection' as never, {
+          configId: activeConfig.id,
+          bundleName: activeConfig.bundle_name || `Config #${activeConfig.id}`,
+        } as never);
+      }
+    }
+  }, [loading, configs, hasRedirected]);
 
   const loadConfigs = async () => {
     try {
@@ -42,34 +61,41 @@ const ConnectionScreen = () => {
     }
   };
 
-  const handleDownloadConfig = async (config: VPNConfig) => {
-    try {
-      const result = await VPNService.downloadConfig(config.id);
+  const handleConnectConfig = (config: VPNConfig) => {
+    const isExpired = new Date(config.expires_at) < new Date();
+    const isActive = config.is_active && !isExpired;
 
-      if (result.success && result.data) {
-        // On mobile, we can share the config file
-        await Share.share({
-          message: result.data,
-          title: result.filename || 'VPN Config',
-        });
-      } else {
-        Alert.alert('Error', result.error || 'Failed to download configuration');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to download configuration');
+    if (!isActive) {
+      Alert.alert(
+        'Configuration Expired',
+        'This VPN configuration has expired. Please purchase a new bundle to continue using the VPN.',
+        [
+          {text: 'OK', style: 'cancel'},
+          {text: 'Browse Bundles', onPress: () => navigation.navigate('Bundles' as never)},
+        ]
+      );
+      return;
     }
+
+    // Navigate to VPN Connection screen
+    navigation.navigate('VPNConnection' as never, {
+      configId: config.id,
+      bundleName: config.bundle_name || `Config #${config.id}`,
+    } as never);
   };
 
   const handleViewConfig = (config: VPNConfig) => {
     const info = VPNService.parseConfigInfo(config.config_data);
+    const isExpired = new Date(config.expires_at) < new Date();
+    const isActive = config.is_active && !isExpired;
 
     Alert.alert(
       'VPN Configuration Details',
-      `Server: ${info.server || 'N/A'}\nPort: ${info.port || 'N/A'}\nProtocol: ${info.protocol || 'N/A'}\n\nExpires: ${new Date(config.expires_at).toLocaleDateString()}`,
+      `Server: ${info.server || 'N/A'}\nPort: ${info.port || 'N/A'}\nProtocol: ${info.protocol || 'WireGuard'}\n\nExpires: ${new Date(config.expires_at).toLocaleDateString()}\nStatus: ${isActive ? 'Active' : 'Expired'}`,
       [
         {text: 'Close', style: 'cancel'},
-        {text: 'Download', onPress: () => handleDownloadConfig(config)},
-      ]
+        isActive && {text: 'Connect', onPress: () => handleConnectConfig(config)},
+      ].filter(Boolean) as any
     );
   };
 
@@ -127,11 +153,11 @@ const ConnectionScreen = () => {
             {isActive && (
               <Button
                 mode="contained"
-                onPress={() => handleDownloadConfig(config)}
+                onPress={() => handleConnectConfig(config)}
                 style={styles.downloadButton}
-                icon="download"
+                icon="vpn-key"
                 contentStyle={styles.downloadButtonContent}>
-                Download Config
+                Connect to VPN
               </Button>
             )}
           </Card.Content>
@@ -165,6 +191,16 @@ const ConnectionScreen = () => {
     );
   }
 
+  // If we're redirecting, show loading instead of the config list
+  if (hasRedirected) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Opening VPN connection...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {configs.length > 0 ? (
@@ -183,12 +219,9 @@ const ConnectionScreen = () => {
           {/* Instructions Card */}
           <Card style={styles.instructionsCard}>
             <Card.Content>
-              <Text style={styles.instructionsTitle}>How to Connect</Text>
+              <Text style={styles.instructionsTitle}>Your VPN Configurations</Text>
               <Text style={styles.instructionsText}>
-                1. Download your VPN configuration file below{'\n'}
-                2. Install OpenVPN Connect app from Play Store/App Store{'\n'}
-                3. Import the downloaded .ovpn file{'\n'}
-                4. Connect and enjoy secure browsing!
+                Manage your active VPN configurations here. Tap on a configuration below to connect to your secure VPN tunnel.
               </Text>
             </Card.Content>
           </Card>

@@ -19,6 +19,7 @@ const PaymentStatusScreen = () => {
   const [loading, setLoading] = useState(true);
   const [polling, setPolling] = useState(true);
   const [generatingConfig, setGeneratingConfig] = useState(false);
+  const [generatedConfigId, setGeneratedConfigId] = useState<number | null>(null);
 
   const handleAuthError = async (message?: string) => {
     const msg = message?.toLowerCase() || '';
@@ -69,6 +70,9 @@ const PaymentStatusScreen = () => {
                 genResult.error ||
                   'Payment was successful, but we could not prepare your VPN configuration automatically. You can try again from the Connection tab.'
               );
+            } else if (genResult.config) {
+              // Store the generated config ID to navigate with it
+              setGeneratedConfigId(genResult.config.id);
             }
           } catch (genError: any) {
             console.error('Error generating VPN config after payment:', genError);
@@ -112,8 +116,16 @@ const PaymentStatusScreen = () => {
 
   const handleDone = () => {
     if (payment?.status === 'completed') {
-      // After successful payment, navigate to Connection tab so user can see VPN configs
-      navigation.navigate('Main' as never, {screen: 'Connection'} as never);
+      // After successful payment, navigate to VPN Connection screen to connect immediately
+      if (generatedConfigId) {
+        navigation.navigate('VPNConnection' as never, {
+          configId: generatedConfigId,
+          bundleName: bundleName,
+        } as never);
+      } else {
+        // Fallback to Connection tab if config ID not available
+        navigation.navigate('Main' as never, {screen: 'Connection'} as never);
+      }
     } else {
       navigation.goBack();
     }
@@ -171,7 +183,7 @@ const PaymentStatusScreen = () => {
 
     switch (payment.status) {
       case 'completed':
-        return `Your ${bundleName} has been activated successfully. You can now download your VPN configuration from the Connection tab.`;
+        return `Your ${bundleName} has been activated successfully. Tap below to connect to your secure VPN.`;
       case 'failed':
         return 'Your payment could not be processed. Please try again or contact support if the issue persists.';
       case 'cancelled':
@@ -257,7 +269,7 @@ const PaymentStatusScreen = () => {
             style={styles.button}
             contentStyle={styles.buttonContent}
             labelStyle={styles.buttonLabel}>
-            Go to Home
+            Connect to VPN
           </Button>
         )}
 

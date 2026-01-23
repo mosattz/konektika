@@ -14,13 +14,14 @@ import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import HomeScreen from './src/screens/main/HomeScreen';
 import BundlesScreen from './src/screens/main/BundlesScreen';
-import ConnectionScreen from './src/screens/main/ConnectionScreen';
+import ConnectionTabScreen from './src/screens/main/ConnectionTabScreen';
 import ProfileScreen from './src/screens/main/ProfileScreen';
 import BundleDetailScreen from './src/screens/bundles/BundleDetailScreen';
 import PaymentScreen from './src/screens/payment/PaymentScreen';
 import PaymentStatusScreen from './src/screens/payment/PaymentStatusScreen';
 import PesapalCheckoutScreen from './src/screens/payment/PesapalCheckoutScreen';
 import PaymentHistoryScreen from './src/screens/payment/PaymentHistoryScreen';
+import VPNConnectionScreen from './src/screens/main/VPNConnectionScreen';
 
 // Services
 import {AuthService} from './src/services/AuthService';
@@ -36,6 +37,7 @@ export type RootStackParamList = {
   PesapalCheckout: {paymentId: string; bundleId: number; bundleName: string; redirectUrl: string};
   PaymentStatus: {paymentId: string; bundleId: number; bundleName: string};
   PaymentHistory: undefined;
+  VPNConnection: {configId: number; bundleName?: string};
 };
 
 export type AuthStackParamList = {
@@ -121,9 +123,10 @@ function MainNavigator() {
       />
       <Tab.Screen 
         name="Connection" 
-        component={ConnectionScreen}
+        component={ConnectionTabScreen}
         options={{
           title: 'Connection',
+          headerShown: false,
         }}
       />
       <Tab.Screen 
@@ -271,6 +274,13 @@ export default function App(): React.JSX.Element {
                   headerStyle: {backgroundColor: theme.colors.primary},
                   headerTintColor: '#FFFFFF',
                   title: 'Payment History',
+                }}
+              />
+              <Stack.Screen 
+                name="VPNConnection" 
+                component={VPNConnectionScreen}
+                options={{
+                  headerShown: false,
                 }}
               />
             </>
