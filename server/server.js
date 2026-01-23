@@ -128,6 +128,31 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Database health check endpoint
+app.get('/health/db', async (req, res) => {
+  try {
+    const { query } = require('./config/database');
+    // Simple query to test database connection
+    await query('SELECT 1 as test');
+    
+    res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+      message: 'Database connection is healthy'
+    });
+  } catch (error) {
+    logger.error('Database health check failed:', error);
+    res.status(500).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Database connection failed',
+      message: 'Failed to connect to database'
+    });
+  }
+});
+
 // VPN health endpoint: summarizes VPN server status as seen from this API.
 // NOTE: WireGuard server status is checked locally on this host.
 app.get('/health/vpn', async (req, res) => {
