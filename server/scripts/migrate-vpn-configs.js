@@ -78,6 +78,33 @@ async function migrateVpnConfigs() {
       logger.info('✅ ovpn_config column already exists');
     }
 
+    // Fix protocol column type
+    logger.info('Checking protocol column type...');
+    const protocolColumn = await query(`
+      SELECT COLUMN_TYPE 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'vpn_configs' 
+        AND COLUMN_NAME = 'protocol'
+    `);
+
+    if (protocolColumn.length > 0) {
+      const columnType = protocolColumn[0].COLUMN_TYPE;
+      logger.info(`Current protocol column type: ${columnType}`);
+      
+      // If it's not VARCHAR(20) or doesn't allow 'wireguard', change it
+      if (!columnType.includes('varchar') || columnType === "enum('udp','tcp')") {
+        logger.info('Updating protocol column to VARCHAR(20)...');
+        await query(`
+          ALTER TABLE vpn_configs 
+          MODIFY COLUMN protocol VARCHAR(20) DEFAULT 'wireguard'
+        `);
+        logger.info('✅ Updated protocol column type');
+      } else {
+        logger.info('✅ Protocol column type is correct');
+      }
+    }
+
     logger.info('✅ VPN configs table migration completed successfully!');
     return true;
   } catch (error) {
