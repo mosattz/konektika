@@ -44,7 +44,7 @@ app.use('/api/', limiter);
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps)
+    // Allow requests with no origin (like mobile apps, webhooks)
     if (!origin) return callback(null, true);
     
     // Allow localhost for development
@@ -56,10 +56,17 @@ const corsOptions = {
     const allowedOrigins = [
       'https://konektika.com',
       'https://app.konektika.com',
-      'https://konektika.online'
+      'https://konektika.online',
+      'https://pay.pesapal.com',
+      'https://cybqa.pesapal.com'
     ];
     
     if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Allow PesaPal domains
+    if (origin && (origin.includes('pesapal.com') || origin.includes('pesapal'))) {
       return callback(null, true);
     }
     
