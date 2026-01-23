@@ -193,6 +193,39 @@ app.post('/setup/database', async (req, res) => {
   }
 });
 
+// Database migration endpoint
+app.post('/setup/migrate-vpn', async (req, res) => {
+  try {
+    // Check for setup key in request (basic security)
+    const setupKey = req.headers['x-setup-key'];
+    const expectedKey = process.env.SETUP_KEY || 'konektika_setup_2024';
+    
+    if (setupKey !== expectedKey) {
+      return res.status(403).json({
+        status: 'ERROR',
+        message: 'Invalid setup key. Provide X-Setup-Key header.'
+      });
+    }
+
+    const { migrateVpnConfigs } = require('./scripts/migrate-vpn-configs');
+    await migrateVpnConfigs();
+    
+    res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      message: 'VPN configs table migrated successfully'
+    });
+  } catch (error) {
+    logger.error('VPN migration failed:', error);
+    res.status(500).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      error: process.env.NODE_ENV === 'development' ? error.message : 'VPN migration failed',
+      message: 'Failed to migrate VPN configs table'
+    });
+  }
+});
+
 // VPN health endpoint: summarizes VPN server status as seen from this API.
 // NOTE: WireGuard server status is checked locally on this host.
 app.get('/health/vpn', async (req, res) => {

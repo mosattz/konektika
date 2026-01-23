@@ -78,7 +78,10 @@ async function setupDatabase() {
         bundle_id INT NOT NULL,
         
         config_name VARCHAR(255) NOT NULL,
-        config_content TEXT NOT NULL,
+        ovpn_config TEXT NOT NULL,
+        client_key TEXT NOT NULL,
+        client_cert TEXT NOT NULL,
+        client_ip VARCHAR(45),
         
         server_ip VARCHAR(45) NOT NULL,
         server_port INT NOT NULL DEFAULT 51820,
@@ -94,7 +97,8 @@ async function setupDatabase() {
         FOREIGN KEY (bundle_id) REFERENCES bundles(id) ON DELETE CASCADE,
         INDEX idx_user_id (user_id),
         INDEX idx_bundle_id (bundle_id),
-        INDEX idx_status (status)
+        INDEX idx_status (status),
+        INDEX idx_client_ip (client_ip)
       )
     `);
     logger.info('✅ VPN configs table created/verified');
